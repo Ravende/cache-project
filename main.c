@@ -45,19 +45,19 @@ int retrieve_data(void *addr, char data_type) {
                 cache_entry_t* pEntry = &cache_array[cache_index][i];
 
                 if (pEntry->valid == 1 && pEntry->tag == tag) {
-                    int offset = address % DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // Ä³½Ã ºí·Ï ³» ¿ÀÇÁ¼Â
+                    int offset = address % DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // ìºì‹œ ë¸”ë¡ ë‚´ ì˜¤í”„ì…‹
                     printf("Cache hit at Index: %d, Tag: %d, Offset: %d\n", cache_index, tag, offset);
 
                     switch (data_type) {
-                    case 'b':  // ¹ÙÀÌÆ®
+                    case 'b':  // ë°”ì´íŠ¸
                         value_returned = pEntry->data[address % WORD_SIZE_BYTE];
                         num_bytes++;
                         break;
-                    case 'h':  // ÇÏÇÁ¿öµå
+                    case 'h':  // í•˜í”„ì›Œë“œ
                         value_returned = *((short*)&pEntry->data[address % WORD_SIZE_BYTE]);
                         num_bytes += 2;
                         break;
-                    case 'w':  // ¿öµå
+                    case 'w':  // ì›Œë“œ
                         value_returned = *((int*)&pEntry->data[address % WORD_SIZE_BYTE]);
                         num_bytes += 4;
                         break;
@@ -87,12 +87,12 @@ int main(void) {
     init_memory_content();
     init_cache_content();
     
-    ifp = fopen("C:/Users/raven/OneDrive/¹ÙÅÁ È­¸é/2-2/Computer Architecture/20493-01-Project-Skeleton/access_input.txt", "r");
+    ifp = fopen("access_input.txt", "r");
     if (ifp == NULL) {
         printf("Can't open input file\n");
         return -1;
     }
-    ofp = fopen("C:/Users/raven/OneDrive/¹ÙÅÁ È­¸é/2-2/Computer Architecture/20493-01-Project-Skeleton/access_output.txt", "w");
+    ofp = fopen("access_output.txt", "w");
     if (ofp == NULL) {
         printf("Can't open output file\n");
         fclose(ifp);
@@ -101,7 +101,7 @@ int main(void) {
 
     /* Fill out here by invoking retrieve_data() */
 
-    char buffer[256];  // ÇÑ ÁÙÀ» ÀúÀåÇÒ ¹öÆÛ (ÀûÀıÇÑ Å©±â·Î ¼³Á¤)
+    char buffer[256];  // í•œ ì¤„ì„ ì €ì¥í•  ë²„í¼ (ì ì ˆí•œ í¬ê¸°ë¡œ ì„¤ì •)
     while (fgets(buffer, sizeof(buffer), ifp) != NULL) {
         //printf("Buffer content: %s\n", buffer);
 
