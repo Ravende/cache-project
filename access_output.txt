@@ -1,0 +1,9 @@
+3   b  0x1
+68   h  0
+4   h  0xfffffeed
+48   w  0
+69   b  0
+------------------------------------------------
+[Direct mapped cache performance]
+Hit ratio = 0.80 (4/5)
+Bandwidth = 0.03 (3/105)
