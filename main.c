@@ -85,12 +85,12 @@ int main(void) {
     init_memory_content();
     init_cache_content();
     
-    ifp = fopen("C:/Users/raven/OneDrive/πŸ≈¡ »≠∏È/2-2/Computer Architecture/20493-01-Project-Skeleton/access_input.txt", "r");
+    ifp = fopen("access_input.txt", "r");
     if (ifp == NULL) {
         printf("Can't open input file\n");
         return -1;
     }
-    ofp = fopen("C:/Users/raven/OneDrive/πŸ≈¡ »≠∏È/2-2/Computer Architecture/20493-01-Project-Skeleton/access_output.txt", "w");
+    ofp = fopen("access_output.txt", "w");
     if (ofp == NULL) {
         printf("Can't open output file\n");
         fclose(ifp);
