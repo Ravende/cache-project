@@ -80,55 +80,55 @@ void print_cache_entries() {
     }
 }
 
-
-long int convertToBinary(int num) {
-    long int binary = 0;
-    int remainder, i = 1;
-
-    while (num != 0) {
-        remainder = num % 2;
-        num /= 2;
-        binary += remainder * i;
-        i *= 10;  // 자리수를 늘려가며 이진수를 만들어 줌
-    }
-
-    return binary;
-}
-
 int check_cache_data_hit(void *addr, char type) {
 
     /* Fill out here */
 
     //0. addr 변환해서 block address로
-    int address = *((int*)addr);  // 확인 필요
-    int block_address = address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;
-    int blocks_in_cache = DEFAULT_CACHE_SIZE_BYTE / DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // 4
+    int byte_address = *((int*)addr);
+    int block_address = byte_address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;
+    int block_offset = byte_address % DEFAULT_CACHE_BLOCK_SIZE_BYTE;
+    //int blocks_in_cache = DEFAULT_CACHE_SIZE_BYTE / DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // 4
 
     //0-1. block address에서 cacheIndex/tag 추출
-    int cache_index = block_address % (blocks_in_cache / DEFAULT_CACHE_ASSOC);
-    int tag = block_address / blocks_in_cache;
-    //printf("Block Address: %d, Cache Index: %d, Tag: %d\n", block_address, cache_index, tag);
+    int cache_index = block_address % CACHE_SET_SIZE;
+    int tag = block_address / CACHE_SET_SIZE;
 
     //1. cache index 찾아야 하고
     //2. index의 valid bit 1인지 확인
     //3. 그 tag 일치하는지
-    if (cache_index >= 0 && cache_index < CACHE_SET_SIZE) {
-        for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {
-            cache_entry_t* pEntry = &cache_array[cache_index][i];
-            //printf("Set: %d, Entry: %d, Valid: %d, Tag: %d\n", cache_index, i, pEntry->valid, pEntry->tag);
-            
-            if (pEntry->valid == 1 && pEntry->tag == tag) {
-                //printf("Cache Hit: Set %d, Entry %d\n", cache_index, i);
-                num_cache_hits++;
-                return 1;
+    for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {
+        cache_entry_t* pEntry = &cache_array[cache_index][i];
+        if (pEntry->valid == 1 && pEntry->tag == tag) {
+
+            int cache_data = -1;
+            int offset = block_offset;  // 확인 필요!
+            printf("Address: %d\tOffset: %d\n", byte_address, offset);
+            switch (type) {
+            case 'b':
+                cache_data = pEntry->data[offset];
+                num_bytes++;
+                break;
+            case 'h':
+                cache_data = *((short*)&pEntry->data[offset]);
+                num_bytes += 2;
+                break;
+            case 'w':
+                cache_data = *((int*)&pEntry->data[offset]);
+                num_bytes += 4;
+                break;
             }
+
+            pEntry->timestamp = global_timestamp;
+            num_cache_hits++;
+            num_access_cycles += CACHE_ACCESS_CYCLE;
+            return cache_data;
         }
-        /*printf("Cache Miss: Set %d\n", cache_index);*/
-        num_cache_misses++;
     }
+    num_cache_misses++;
 
     /* Return the data */
-    return 0;
+    return -1;
 }
 
 int find_entry_index_in_set(int cache_index) {
@@ -144,7 +144,6 @@ int find_entry_index_in_set(int cache_index) {
 
     /* Otherwise, search over all entries to find the least recently used entry by checking 'timestamp' */
     int least_recent_used_timestamp = cache_array[cache_index][0].timestamp;
-
     for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {
         cache_entry_t* pEntry = &cache_array[cache_index][i];
         if (pEntry->timestamp < least_recent_used_timestamp) {
@@ -152,10 +151,6 @@ int find_entry_index_in_set(int cache_index) {
             entry_index = i;
         }
     }
-
-    //printf("Cache Index: %d, Entry Index: %d, Tag in Cache: %d, Valid: %d\n",
-    //    cache_index, entry_index, cache_array[cache_index][entry_index].tag,
-    //    cache_array[cache_index][entry_index].valid);
 
     return entry_index; 
 }
@@ -165,50 +160,52 @@ int access_memory(void* addr, char type) {
     /* Fetch the data from the main memory and copy them to the cache */
     /* void *addr: addr is byte address, whereas your main memory address is word address due to 'int memory_array[]' */
 
-    int address = *((int*)addr);
-    //printf("%d\n", address);
-    int memory_word_address = address / 4;
-    int block_address = address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;
-    int blocks_in_cache = DEFAULT_CACHE_SIZE_BYTE / DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // 4
-    int cache_index = block_address % (blocks_in_cache / DEFAULT_CACHE_ASSOC);
-    printf("Cache Index: %d\n", cache_index);
+    int byte_address = *((int*)addr);
+    int word_address = byte_address / WORD_SIZE_BYTE;
+    int word_offset = byte_address % WORD_SIZE_BYTE;
+
+    int block_address = byte_address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;
+    int block_offset = byte_address % DEFAULT_CACHE_BLOCK_SIZE_BYTE;
+
+    //int blocks_in_cache = DEFAULT_CACHE_SIZE_BYTE / DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // 4
+    int cache_index = block_address % CACHE_SET_SIZE;
 
     /* You need to invoke find_entry_index_in_set() for copying to the cache */
     int entry_index = find_entry_index_in_set(cache_index);
 
     cache_entry_t* pEntry = &cache_array[cache_index][entry_index];
     pEntry->valid = 1;
-    pEntry->tag = block_address / (blocks_in_cache / DEFAULT_CACHE_ASSOC);
+    pEntry->tag = block_address / CACHE_SET_SIZE;
     pEntry->timestamp = global_timestamp;
 
     char* ptr = (char*)memory_array;
 
-    for (int i = 0; i < WORD_SIZE_BYTE; i++) {    // 4. 확인 필요
-        int memory_byte_address = memory_word_address * 4 + i;
-        if (memory_byte_address < DEFAULT_MEMORY_SIZE_WORD * 4) {
-            pEntry->data[i] = ptr[memory_byte_address];
-        }
-        printf("Memory Address: %d\n", memory_byte_address);
+    int start_of_memory_address = block_address * DEFAULT_CACHE_BLOCK_SIZE_BYTE;
+    for (int i = 0; i < DEFAULT_CACHE_BLOCK_SIZE_BYTE; i++) {
+        printf("Word Address: %d\tOffset: %d\n", word_address, start_of_memory_address + i);
+        pEntry->data[i] = ptr[start_of_memory_address + i];
     }
 
     /* Return the accessed data with a suitable type */
-    int accessed_data = 0;
+    int accessed_data = -1;
+    int offset = block_offset;  // 확인 필요!
+    printf("Address: %d\tOffset: %d\n", byte_address, offset);
     switch (type) {
     case 'b':
-        accessed_data = pEntry->data[address % WORD_SIZE_BYTE];
+        accessed_data = pEntry->data[offset];
         num_bytes++;
         break;
     case 'h':
-        accessed_data = *((short*)&pEntry->data[address % WORD_SIZE_BYTE]);
+        accessed_data = *((short*)&pEntry->data[offset]);
         num_bytes += 2;
         break;
     case 'w':
-        accessed_data = *((int*)&pEntry->data[address % WORD_SIZE_BYTE]);
+        accessed_data = *((int*)&pEntry->data[offset]);
         num_bytes += 4;
         break;
     }
+    printf("\n");
 
+    num_access_cycles += CACHE_ACCESS_CYCLE + MEMORY_ACCESS_CYCLE;
     return accessed_data;
-
-    //return 0;
 }
