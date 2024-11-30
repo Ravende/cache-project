@@ -27,37 +27,37 @@ int retrieve_data(void *addr, char data_type) {
     int address = *((int*)addr);
     int block_address = address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;
     int blocks_in_cache = DEFAULT_CACHE_SIZE_BYTE / DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // 4
-    int cache_index = block_address % blocks_in_cache;
-    int tag = block_address / blocks_in_cache;
+    int cache_index = block_address % (blocks_in_cache / DEFAULT_CACHE_ASSOC);
+    int tag = block_address / (blocks_in_cache / DEFAULT_CACHE_ASSOC);
 
-    printf("Cache Index: %d, Tag: %d\n", cache_index, tag);
     extern cache_entry_t cache_array[CACHE_SET_SIZE][DEFAULT_CACHE_ASSOC];
+    printf("Block Address: %d, Cache Index: %d, Tag: %d\n", block_address, cache_index, tag);
 
     /* Invoke check_cache_data_hit() */
     int hit_check = check_cache_data_hit(addr, data_type);
+    printf("Hit: %d\n", hit_check);
 
     if (hit_check) {
-
-        printf("Address: %d, Block Address: %d, Cache Index: %d, Tag: %d\n",address, block_address, cache_index, tag);
 
         if (cache_index >= 0 && cache_index < CACHE_SET_SIZE) {
             for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {
                 cache_entry_t* pEntry = &cache_array[cache_index][i];
+                printf("Valid: %d\n", pEntry->valid);
 
                 if (pEntry->valid == 1 && pEntry->tag == tag) {
-                    int offset = address % DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // 캐시 블록 내 오프셋
-                    printf("Cache hit at Index: %d, Tag: %d, Offset: %d\n", cache_index, tag, offset);
 
                     switch (data_type) {
-                    case 'b':  // 바이트
+                        printf("%d\n", address);
+                    case 'b':
                         value_returned = pEntry->data[address % WORD_SIZE_BYTE];
                         num_bytes++;
                         break;
-                    case 'h':  // 하프워드
+                    case 'h':
                         value_returned = *((short*)&pEntry->data[address % WORD_SIZE_BYTE]);
                         num_bytes += 2;
+                        printf("Cache Hit@ Entry Index: %d\t%c type - Accessed Data: %d\n", i, data_type, address % WORD_SIZE_BYTE);
                         break;
-                    case 'w':  // 워드
+                    case 'w':
                         value_returned = *((int*)&pEntry->data[address % WORD_SIZE_BYTE]);
                         num_bytes += 4;
                         break;
@@ -65,17 +65,15 @@ int retrieve_data(void *addr, char data_type) {
                 }
             }
         }
-        num_cache_hits++;
         num_access_cycles += CACHE_ACCESS_CYCLE;
     } else {
         value_returned = access_memory(addr, data_type);
-        num_cache_misses++;
         num_access_cycles += CACHE_ACCESS_CYCLE + MEMORY_ACCESS_CYCLE;
     }
 
     global_timestamp++;
 
-    return value_returned;    
+    return value_returned;
 }
 
 int main(void) {
@@ -101,14 +99,15 @@ int main(void) {
 
     /* Fill out here by invoking retrieve_data() */
 
-    char buffer[256];  // 한 줄을 저장할 버퍼 (적절한 크기로 설정)
+    char buffer[256];
+    fprintf(ofp, "[Accessed Data]\n");
     while (fgets(buffer, sizeof(buffer), ifp) != NULL) {
         //printf("Buffer content: %s\n", buffer);
 
         (void)sscanf(buffer, "%lu %c", &access_addr, &access_type);
         
         accessed_data = retrieve_data(&access_addr, access_type);
-        fprintf(ofp, "%lu   %c  %#x\n", access_addr, access_type, accessed_data);
+        fprintf(ofp, "%lu\t\t%c\t\t%#x\n", access_addr, access_type, accessed_data);
     }
 
     fprintf(ofp, "------------------------------------------------\n");

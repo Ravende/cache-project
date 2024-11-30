@@ -45,7 +45,7 @@ void init_memory_content() {
             
         printf("mem[%d] = %#x\n", index, memory_array[index]);
     }
-}   
+}  
 
 /* DO NOT CHANGE THE FOLLOWING FUNCTION */
 void init_cache_content() {
@@ -80,18 +80,34 @@ void print_cache_entries() {
     }
 }
 
+
+long int convertToBinary(int num) {
+    long int binary = 0;
+    int remainder, i = 1;
+
+    while (num != 0) {
+        remainder = num % 2;
+        num /= 2;
+        binary += remainder * i;
+        i *= 10;  // 자리수를 늘려가며 이진수를 만들어 줌
+    }
+
+    return binary;
+}
+
 int check_cache_data_hit(void *addr, char type) {
 
     /* Fill out here */
 
     //0. addr 변환해서 block address로
     int address = *((int*)addr);  // 확인 필요
-    int block_address = floor(address / DEFAULT_CACHE_BLOCK_SIZE_BYTE);
+    int block_address = address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;
     int blocks_in_cache = DEFAULT_CACHE_SIZE_BYTE / DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // 4
 
     //0-1. block address에서 cacheIndex/tag 추출
-    int cache_index = block_address % blocks_in_cache;
+    int cache_index = block_address % (blocks_in_cache / DEFAULT_CACHE_ASSOC);
     int tag = block_address / blocks_in_cache;
+    //printf("Block Address: %d, Cache Index: %d, Tag: %d\n", block_address, cache_index, tag);
 
     //1. cache index 찾아야 하고
     //2. index의 valid bit 1인지 확인
@@ -99,12 +115,16 @@ int check_cache_data_hit(void *addr, char type) {
     if (cache_index >= 0 && cache_index < CACHE_SET_SIZE) {
         for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {
             cache_entry_t* pEntry = &cache_array[cache_index][i];
+            //printf("Set: %d, Entry: %d, Valid: %d, Tag: %d\n", cache_index, i, pEntry->valid, pEntry->tag);
+            
             if (pEntry->valid == 1 && pEntry->tag == tag) {
-                //num_cache_hits++;
+                //printf("Cache Hit: Set %d, Entry %d\n", cache_index, i);
+                num_cache_hits++;
                 return 1;
             }
         }
-        //num_cache_misses++;
+        /*printf("Cache Miss: Set %d\n", cache_index);*/
+        num_cache_misses++;
     }
 
     /* Return the data */
@@ -112,80 +132,33 @@ int check_cache_data_hit(void *addr, char type) {
 }
 
 int find_entry_index_in_set(int cache_index) {
-    int entry_index = -1;
+    int entry_index = 0;
 
     /* Check if there exists any empty cache space by checking 'valid' */
     for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {
         cache_entry_t* pEntry = &cache_array[cache_index][i];
-        if (pEntry->valid == 0)
+        if (pEntry->valid == 0) {
             return i;
+        }
     }
 
     /* Otherwise, search over all entries to find the least recently used entry by checking 'timestamp' */
-    if (entry_index == -1) {
-        entry_index = 0;  // 초기화? 확인 필요
-        int least_recent_used_timestamp = cache_array[cache_index][0].timestamp;
+    int least_recent_used_timestamp = cache_array[cache_index][0].timestamp;
 
-        for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {
-            cache_entry_t* pEntry = &cache_array[cache_index][i];
-            if (pEntry->timestamp < least_recent_used_timestamp) {
-                least_recent_used_timestamp = pEntry->timestamp;
-                entry_index = i;
-            }
-        }   
+    for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {
+        cache_entry_t* pEntry = &cache_array[cache_index][i];
+        if (pEntry->timestamp < least_recent_used_timestamp) {
+            least_recent_used_timestamp = pEntry->timestamp;
+            entry_index = i;
+        }
     }
+
+    //printf("Cache Index: %d, Entry Index: %d, Tag in Cache: %d, Valid: %d\n",
+    //    cache_index, entry_index, cache_array[cache_index][entry_index].tag,
+    //    cache_array[cache_index][entry_index].valid);
 
     return entry_index; 
 }
-
-//int access_memory(void *addr, char type) {
-//    
-//    /* Fetch the data from the main memory and copy them to the cache */
-//    /* void *addr: addr is byte address, whereas your main memory address is word address due to 'int memory_array[]' */
-//
-//    /* You need to invoke find_entry_index_in_set() for copying to the cache */
-//    
-//
-//    /* Return the accessed data with a suitable type */    
-//
-//    int address = *((int*)addr);
-//    //int word_address = address / 4;
-//    //int memory_address_byte = address % 4;
-//    char* ptr = (char*)memory_array;
-//
-//    int entry_index = find_entry_index_in_set(addr);
-//
-//    for (int i = 0; i < WORD_SIZE_BYTE; i++) {
-//        cache_array[address][entry_index].data[i] = ptr[address + i];   //cache_array[address][entry_index].data[address] = memory_array[word_address];
-//    }  // 수정 필요
-//
-//    int data_size = 0;
-//    switch (type) {
-//    case 'b':
-//        data_size = 1;
-//        break;
-//    case 'h':
-//        data_size = 2;
-//        break;
-//    case 'w':
-//        data_size = 4;
-//        break;
-//    }
-//
-//    char accessed_data = "0x";
-//    for (int i = 0; i < 4 - data_size; i--) {
-//        strcpy(accessed_data, "ff");
-//    }
-//    for (int i = data_size; i > 0; i--) {
-//        strcpy(accessed_data, ptr[address + (i - 1)]);
-//    }
-//
-//    unsigned long int int_accessed_data = (unsigned int)strtol(accessed_data, NULL, 16);
-//
-//    return int_accessed_data;
-//    
-//    //return 0;
-//}
 
 int access_memory(void* addr, char type) {
 
@@ -193,18 +166,19 @@ int access_memory(void* addr, char type) {
     /* void *addr: addr is byte address, whereas your main memory address is word address due to 'int memory_array[]' */
 
     int address = *((int*)addr);
-    printf("%d\n", address);   // 왜 3 2번 출력? 확인 필요
+    //printf("%d\n", address);
     int memory_word_address = address / 4;
     int block_address = address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;
     int blocks_in_cache = DEFAULT_CACHE_SIZE_BYTE / DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // 4
-    int cache_index = block_address % blocks_in_cache;
+    int cache_index = block_address % (blocks_in_cache / DEFAULT_CACHE_ASSOC);
+    printf("Cache Index: %d\n", cache_index);
 
     /* You need to invoke find_entry_index_in_set() for copying to the cache */
     int entry_index = find_entry_index_in_set(cache_index);
 
     cache_entry_t* pEntry = &cache_array[cache_index][entry_index];
     pEntry->valid = 1;
-    pEntry->tag = block_address / blocks_in_cache;
+    pEntry->tag = block_address / (blocks_in_cache / DEFAULT_CACHE_ASSOC);
     pEntry->timestamp = global_timestamp;
 
     char* ptr = (char*)memory_array;
@@ -214,20 +188,21 @@ int access_memory(void* addr, char type) {
         if (memory_byte_address < DEFAULT_MEMORY_SIZE_WORD * 4) {
             pEntry->data[i] = ptr[memory_byte_address];
         }
+        printf("Memory Address: %d\n", memory_byte_address);
     }
 
     /* Return the accessed data with a suitable type */
     int accessed_data = 0;
     switch (type) {
-    case 'b':  // 바이트
+    case 'b':
         accessed_data = pEntry->data[address % WORD_SIZE_BYTE];
         num_bytes++;
         break;
-    case 'h':  // 하프워드
+    case 'h':
         accessed_data = *((short*)&pEntry->data[address % WORD_SIZE_BYTE]);
         num_bytes += 2;
         break;
-    case 'w':  // 워드
+    case 'w':
         accessed_data = *((int*)&pEntry->data[address % WORD_SIZE_BYTE]);
         num_bytes += 4;
         break;
