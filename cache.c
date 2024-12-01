@@ -29,31 +29,31 @@ int memory_array[DEFAULT_MEMORY_SIZE_WORD];
 
 /* DO NOT CHANGE THE FOLLOWING FUNCTION */
 void init_memory_content() {
-    unsigned char sample_upward[16] = {0x001, 0x012, 0x023, 0x034, 0x045, 0x056, 0x067, 0x078, 0x089, 0x09a, 0x0ab, 0x0bc, 0x0cd, 0x0de, 0x0ef};
-    unsigned char sample_downward[16] = {0x0fe, 0x0ed, 0x0dc, 0x0cb, 0x0ba, 0x0a9, 0x098, 0x087, 0x076, 0x065, 0x054, 0x043, 0x032, 0x021, 0x010};
-    int index, i=0, j=1, gap = 1;
-    
-    for (index=0; index < DEFAULT_MEMORY_SIZE_WORD; index++) {
+    unsigned char sample_upward[16] = { 0x001, 0x012, 0x023, 0x034, 0x045, 0x056, 0x067, 0x078, 0x089, 0x09a, 0x0ab, 0x0bc, 0x0cd, 0x0de, 0x0ef };
+    unsigned char sample_downward[16] = { 0x0fe, 0x0ed, 0x0dc, 0x0cb, 0x0ba, 0x0a9, 0x098, 0x087, 0x076, 0x065, 0x054, 0x043, 0x032, 0x021, 0x010 };
+    int index, i = 0, j = 1, gap = 1;
+
+    for (index = 0; index < DEFAULT_MEMORY_SIZE_WORD; index++) {
         memory_array[index] = (sample_upward[i] << 24) | (sample_upward[j] << 16) | (sample_downward[i] << 8) | (sample_downward[j]);
         if (++i >= 16)
             i = 0;
         if (++j >= 16)
             j = 0;
-        
-        if (i == 0 && j == i+gap)
+
+        if (i == 0 && j == i + gap)
             j = i + (++gap);
-            
+
         printf("mem[%d] = %#x\n", index, memory_array[index]);
     }
-}  
+}
 
 /* DO NOT CHANGE THE FOLLOWING FUNCTION */
 void init_cache_content() {
     int i, j;
-    
-    for (i=0; i<CACHE_SET_SIZE; i++) {
-        for (j=0; j < DEFAULT_CACHE_ASSOC; j++) {
-            cache_entry_t *pEntry = &cache_array[i][j];
+
+    for (i = 0; i < CACHE_SET_SIZE; i++) {
+        for (j = 0; j < DEFAULT_CACHE_ASSOC; j++) {
+            cache_entry_t* pEntry = &cache_array[i][j];
             pEntry->valid = 0;
             pEntry->tag = -1;
             pEntry->timestamp = 0;
@@ -65,13 +65,13 @@ void init_cache_content() {
 /* This function is a utility function to print all the cache entries. It will be useful for your debugging */
 void print_cache_entries() {
     int i, j, k;
-    
-    for (i=0; i<CACHE_SET_SIZE; i++) {
+
+    for (i = 0; i < CACHE_SET_SIZE; i++) {
         printf("[Set %d] ", i);
-        for (j=0; j <DEFAULT_CACHE_ASSOC; j++) {
-            cache_entry_t *pEntry = &cache_array[i][j];
+        for (j = 0; j < DEFAULT_CACHE_ASSOC; j++) {
+            cache_entry_t* pEntry = &cache_array[i][j];
             printf("V: %d Tag: %#x Time: %d Data: ", pEntry->valid, pEntry->tag, pEntry->timestamp);
-            for (k=0; k<DEFAULT_CACHE_BLOCK_SIZE_BYTE; k++) {
+            for (k = 0; k < DEFAULT_CACHE_BLOCK_SIZE_BYTE; k++) {
                 printf("%#x(%d) ", pEntry->data[k], k);
             }
             printf("\t");
@@ -80,117 +80,118 @@ void print_cache_entries() {
     }
 }
 
-int check_cache_data_hit(void *addr, char type) {    // cache의 hit 여부를 찾는 함수. cache hit 시 cache에서 바로 읽은 데이터를, miss 시 -1을 반환한다.
-
+int check_cache_data_hit(void* addr, char type) {    // Function to find whether the cache is hit. On a cache hit, returns data read whereas on miss, returns -1.
+    
     /* Fill out here */
 
-    int byte_address = *((int*)addr);                                  // void 타입의 addr을 int 타입으로 변환해 byte_address에 넣음 (연산 위함)
-    int block_address = byte_address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // byte_address를 block size(8)로 나눠 block_address로 변환함
-    int block_offset = byte_address % DEFAULT_CACHE_BLOCK_SIZE_BYTE;   // byte_address를 blcok size(8)로 나누는 연산의 나머지를 취해 block_offset 만듦
+    int byte_address = *((int*)addr);                                  // Convert the void type addr to int type and assigns it to byte_address (for calculations)
+    int block_address = byte_address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;  // Convert byte_address to block_address by dividing by block size (8)
+    int block_offset = byte_address % DEFAULT_CACHE_BLOCK_SIZE_BYTE;   // Take the remainder of the division of byte_address by block size (8) to create block_offset
 
-    int cache_index = block_address % CACHE_SET_SIZE;  // block_address를 set size로 나눈 나머지를 취해 (modulo 연산) cache index 추출
-    int tag = block_address / CACHE_SET_SIZE;          // block_address를 set size로 나눈 몫을 취해 tag 추출
+    int cache_index = block_address % CACHE_SET_SIZE;  // Obtain cache index by taking the remainder (modulo operation) of block_address divided by set size
+    int tag = block_address / CACHE_SET_SIZE;          // Obtain tag by dividing block_address by set size
 
-    for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {             // i를 캐시의 associativity만큼 돌면서 해당 set의 entry 하나씩 전부 확인
-        cache_entry_t* pEntry = &cache_array[cache_index][i];   // cache_array 배열에 계산한 cache index를 set index로, i를 entry index로 주어서 cache_entry_t 구조체 pEntry 생성
-        if (pEntry->valid == 1 && pEntry->tag == tag) {         // 해당 entry의 valid bit이 1인지, tag가 위에서 계산한 tag와 일치하는지 함께 확인 => cache hit인지 확인. 둘 다 충족될 때 hit 판정
+    for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {             // Iterate through the associativity of the cache, checking all entries in the set
+        cache_entry_t* pEntry = &cache_array[cache_index][i];   // Create cache_entry_t structure pEntry from cache_array using the calculated cache index as the set index and i as the entry index
+        if (pEntry->valid == 1 && pEntry->tag == tag) {         // Check if the entry's valid bit is 1 and if its tag matches the calculated tag => determines if it is a cache hit. Hit is determined if both conditions are met.
 
-            int cache_data = -1;                                    // 구조체(캐시 엔트리)에서 가져오는 데이터를 담은 cache_data (초기값 -1)
-            int offset = block_offset;                              // 캐시의 데이터를 어느 바이트부터 가져올지 결정하기 위한 offset: 위에서 계산한 block_offset으로 설정
-            switch (type) {                                         // 함수 파라미터로 전달받은 type(input의 데이터 타입)에 따라 판단하는 switch문
-            case 'b':                                               // type이 'b', 즉 바이트(1byte)인 경우
-                cache_data = pEntry->data[offset];                  // 캐시 엔트리의 data 배열의 offset 위치부터 데이터를 1바이트 읽어옴
-                num_bytes++;                                        // 지금까지 접근한 바이트 수를 뜻하는 num_bytes에 +1
-                break;                                              // case 'b' 실행 후 switch문 밖으로 탈출
-            case 'h':                                               // type이 'h', 즉 하프워드(2byte)인 경우
-                cache_data = *((short*)&pEntry->data[offset]);      // short* 타입으로 주소 변환. => 캐시 엔트리의 data 배열의 offset 위치부터 데이터를 short 크기만큼(2바이트) 읽어옴
-                num_bytes += 2;                                     // 지금까지 접근한 바이트 수를 뜻하는 num_bytes에 +2
-                break;                                              // case 'h' 실행 후 switch문 밖으로 탈출
-            case 'w':                                               // type이 'w', 즉 워드(4byte)인 경우
-                cache_data = *((int*)&pEntry->data[offset]);        // int* 타입으로 주소 변환. => 캐시 엔트리의 data 배열의 offset 위치부터 데이터를 int 크기만큼(4바이트) 읽어옴
-                num_bytes += 4;                                     // 지금까지 접근한 바이트 수를 뜻하는 num_bytes에 +4
-                break;                                              // case 'w' 실행 후 switch문 밖으로 탈출
+            int cache_data = -1;                                    // cache_data holds the data read from the structure (cache entry), initialized to -1
+            int offset = block_offset;                              // Set the offset to decide from which byte of the cache data to retrieve, using the calculated block_offset
+            switch (type) {                                         // Switch statement to determine the type of input data based on the type parameter
+            case 'b':                                               // If type is 'b', i.e., byte (1 byte)
+                cache_data = pEntry->data[offset];                  // Read 1 byte of data from the data array of the cache entry at the offset position
+                num_bytes++;                                        // Increment num_bytes, which represents the total accessed byte count
+                break;                                              // Exit the switch statement after executing case 'b'
+            case 'h':                                               // If type is 'h', i.e., half-word (2 bytes)
+                cache_data = *((short*)&pEntry->data[offset]);      // Read 2 bytes of data from the data array of the cache entry at the offset position by casting to short*
+                num_bytes += 2;                                     // Increment num_bytes by 2
+                break;                                              // Exit the switch statement after executing case 'h'
+            case 'w':                                               // If type is 'w', i.e., word (4 bytes)
+                cache_data = *((int*)&pEntry->data[offset]);        // Read 4 bytes of data from the data array of the cache entry at the offset position by casting to int*
+                num_bytes += 4;                                     // Increment num_bytes by 4
+                break;                                              // Exit the switch statement after executing case 'w'
             }
 
-            pEntry->timestamp = global_timestamp;       // 해당 캐시 엔트리의 timestamp를 지금까지의 전역 timestamp 변수 값으로 설정
-            num_cache_hits++;                           // cache hit 수 +1
-            num_access_cycles += CACHE_ACCESS_CYCLE;    // cache hit이므로 access cycles 수에 cache access cycle인 +1
-            return cache_data;                          // 캐시로부터 읽어온 데이터 반환
+            pEntry->timestamp = global_timestamp;       // Set the timestamp of the cache entry to the global timestamp variable
+            num_cache_hits++;                           // Increment the cache hit count by 1
+            num_access_cycles += CACHE_ACCESS_CYCLE;    // For a cache hit, add the cache access cycle (1) to num_access_cycles
+            return cache_data;                          // Return the data read from the cache
         }
     }
-    num_cache_misses++;      // 해당 cache index(set index)의 모든 entry에서 cache hit이 되지 못했을 경우 cache miss. cache miss 수 +1
+    num_cache_misses++;      // If cache hit does NOT occur for all entries in the set at the cache index, the cache miss count is incremented by 1
 
     /* Return the data */
-    return -1;               // cache miss의 경우 -1 리턴
+    return -1;               // Returns -1 in case of a cache miss
 }
 
-int find_entry_index_in_set(int cache_index) {    // cache index가 주어지면 해당 set의 entry_index를 찾는 함수
-    int entry_index = 0;                          // entry_index 선언. 초기값 0으로 설정
+int find_entry_index_in_set(int cache_index) {    // Function to find the entry_index of a set when the cache index is provided
+    int entry_index = 0;                          // entry_index is declared and initialized to 0
 
     /* Check if there exists any empty cache space by checking 'valid' */
-    for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {             // i를 캐시의 associativity만큼 돌면서 해당 set의 entry 하나씩 전부 확인
-        cache_entry_t* pEntry = &cache_array[cache_index][i];   // cache_array 배열에 파라미터로 받아온 cache index를 set index로, i를 entry index로 주어서 cache_entry_t 구조체 pEntry를 생성
-        if (pEntry->valid == 0) {                               // 만약 pEntry의 valid bit이 0이면 (= 빈 엔트리가 있으면)
-            return i;                                           // 해당 entry의 인덱스 i를 바로 리턴
+    for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {             // Iterate through the associativity of the cache, checking all entries in the set
+        cache_entry_t* pEntry = &cache_array[cache_index][i];   // Create cache_entry_t structure pEntry from cache_array using the cache index and i as the entry index
+        if (pEntry->valid == 0) {                               // If the valid bit of pEntry is 0 (indicating an empty entry)
+            return i;                                           // Immediately returns the index i of the entry
         }
     }
 
     /* Otherwise, search over all entries to find the least recently used entry by checking 'timestamp' */
-    int least_recent_used_timestamp = cache_array[cache_index][0].timestamp;    // 빈 entry가 없는 경우. 사용한 지 가장 오래된 엔트리의 timestamp 저장하는 변수 - 초기값으로 entry 0의 timestamp 저장
-    for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {                             // i를 캐시의 associativity만큼 돌면서 해당 set의 entry 하나씩 전부 확인
-        cache_entry_t* pEntry = &cache_array[cache_index][i];                   // cache_array 배열에 파라미터로 받아온 cache index를 set index로, i를 entry index로 주어서 cache_entry_t 구조체 pEntry를 생성
-        if (pEntry->timestamp < least_recent_used_timestamp) {                  // 해당 entry의 timestamp(어느 시점에 사용되었는지 판별)가 least_recent_used_timestamp보다 작으면 (= 더 오래되었으면)
-            least_recent_used_timestamp = pEntry->timestamp;                    // least_recent_used_timestamp 변수에 해당 entry의 timestamp를 저장하고
-            entry_index = i;                                                    // entry_index에는 해당 entry의 인덱스 i를 저장한다.
+    int least_recent_used_timestamp = cache_array[cache_index][0].timestamp;    // If there are no empty entries, initialize least_recent_used_timestamp to the timestamp of entry 0
+    for (int i = 0; i < DEFAULT_CACHE_ASSOC; i++) {                             // Iterate through the associativity of the cache, checking all entries in the set
+        cache_entry_t* pEntry = &cache_array[cache_index][i];                   // Create cache_entry_t structure pEntry from cache_array using the cache index and i as the entry index
+        if (pEntry->timestamp < least_recent_used_timestamp) {                  // If the timestamp of the entry is less than least_recent_used_timestamp (indicating it was used less recently)
+            least_recent_used_timestamp = pEntry->timestamp;                    // Update least_recent_used_timestamp with the timestamp of the entry
+            entry_index = i;                                                    // Update entry_index with the index i of the entry
         }
     }
 
-    return entry_index;     // for문이 끝나고 LRU timestamp의 entry_index가 나옴. entry_index 반환한다
+    return entry_index;     // Returns entry_index after the loop ends, which is the entry with the LRU timestamp
 }
 
-int access_memory(void* addr, char type) {      // (cache miss의 경우,) input의 주소와 데이터 타입을 파라미터로 받아 메모리에 접근하고 읽은 데이터를 반환해주는 함수
+int access_memory(void* addr, char type) {      // For cache miss cases, this function takes the input address and data type as parameters, accesses the memory, and returns the read data.
 
-    /* Fetch the data from the main memory and copy them to the cache */
-    /* void *addr: addr is byte address, whereas your main memory address is word address due to 'int memory_array[]' */
-    int byte_address = *((int*)addr);                                   // void 타입의 addr을 int 타입으로 변환해 byte_address에 넣음 (연산 위함)
-    int block_address = byte_address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;   // byte_address를 block size(8)로 나눠 block_address로 변환함
-    int block_offset = byte_address % DEFAULT_CACHE_BLOCK_SIZE_BYTE;    // byte_address를 blcok size(8)로 나누는 연산의 나머지를 취해 block_offset 만듦
+    /* Fetch the data from the main memory and copy it to the cache */
+    /* void *addr: addr is a byte address, whereas the main memory address is a word address because of 'int memory_array[]' */
+    int byte_address = *((int*)addr);                                   // Convert the void type addr to int type and assigns it to byte_address (for calculations)
+    int block_address = byte_address / DEFAULT_CACHE_BLOCK_SIZE_BYTE;   // Convert byte_address to block_address by dividing it by the block size (8)
+    int block_offset = byte_address % DEFAULT_CACHE_BLOCK_SIZE_BYTE;    // Calculate block_offset as the remainder of byte_address divided by the block size (8)
 
-    int cache_index = block_address % CACHE_SET_SIZE;                   // block_address를 set size로 나눈 나머지를 취해 (modulo 연산) cache index 추출
+    int cache_index = block_address % CACHE_SET_SIZE;                   // Extract cache index by taking the remainder (modulo operation) of block_address divided by the set size
 
-    /* You need to invoke find_entry_index_in_set() for copying to the cache */
-    int entry_index = find_entry_index_in_set(cache_index);             // 계산한 cache_index를 파라미터로 넣은 find_entry_index_in_set 함수를 불러 entry_index를 찾음
+    /* Invoke find_entry_index_in_set() to copy data to the cache */
+    int entry_index = find_entry_index_in_set(cache_index);             // Call find_entry_index_in_set with the calculated cache_index to find the entry_index
 
-    cache_entry_t* pEntry = &cache_array[cache_index][entry_index];     // cache_array 배열에 계산한 cache index를 set 인덱스로, 파라미터로 받아온 entry_index를 entry 인덱스로 주어서 cache_entry_t 구조체 pEntry를 생성 (메모리의 데이터 copy할 캐시 엔트리)
-    pEntry->valid = 1;                                                  // 해당 entry의 valid bit을 1로 설정
-    pEntry->tag = block_address / CACHE_SET_SIZE;                       // 해당 entry의 tag를 block_address를 set size로 나눈 값으로 설정
-    pEntry->timestamp = global_timestamp;                               // 해당 entry의 timestamp를 지금까지의 전역 timestamp 변수 값으로 설정
+    cache_entry_t* pEntry = &cache_array[cache_index][entry_index];     // Create a cache_entry_t structure pEntry using cache_array with the cache index as the set index and entry_index as the entry index (cache entry to copy memory data)
+    pEntry->valid = 1;                                                  // Set the valid bit of the entry to 1
+    pEntry->tag = block_address / CACHE_SET_SIZE;                       // Set the tag of the entry to the result of block_address divided by the set size
+    pEntry->timestamp = global_timestamp;                               // Set the timestamp of the entry to the current value of the global timestamp variable
 
-    char* ptr = (char*)memory_array;                                    // memory_array를 char(1바이트) 단위로 접근하기 위해 char* 타입으로 캐스팅하여 char* ptr 포인터 변수에 저장
+    char* ptr = (char*)memory_array;                                    // Cast memory_array to char* type for byte (1-byte) access and store it in the char* ptr pointer variable
 
-    int start_of_memory_address = block_address * DEFAULT_CACHE_BLOCK_SIZE_BYTE;        // 읽어올 메모리의 주소(바이트 단위)를 결정하기 위해 block address에 block size(8)을 곱해서 계산
-    for (int i = 0; i < DEFAULT_CACHE_BLOCK_SIZE_BYTE; i++) {                           // for문을 block size(8) 크기만큼 돌면서
-        pEntry->data[i] = ptr[start_of_memory_address + i];                             // pEntry의 data의 i주소(0~7)에 memory_array의 start_of_memory_address 위치부터 i씩 더해주며 한 바이트씩, 모두 2워드 저장
+    int start_of_memory_address = block_address * DEFAULT_CACHE_BLOCK_SIZE_BYTE;        // Calculate the memory address (in bytes) to read by multiplying block_address by the block size (8)
+    for (int i = 0; i < DEFAULT_CACHE_BLOCK_SIZE_BYTE; i++) {                           // Iterate over the block size (8)
+        pEntry->data[i] = ptr[start_of_memory_address + i];                             // Copy one byte at a time from memory_array at start_of_memory_address offset by i into pEntry->data
     }
 
     /* Return the accessed data with a suitable type */
-    int accessed_data = -1;                                 // 메모리에서 접근한 (실제로는 해당 메모리의 데이터를 복사한 캐시 엔트리에서 가져오는) 데이터를 담은 accessed_data (초기값 -1)
-    int offset = block_offset;                              // 캐시의 데이터를 어느 바이트부터 가져올지 결정하기 위한 offset: 위에서 계산한 block_offset으로 설정
-    switch (type) {                                         // 함수 파라미터로 전달받은 type(input의 데이터 타입)에 따라 판단하는 switch문
-    case 'b':                                               // type이 'b', 즉 바이트(1byte)인 경우
-        accessed_data = pEntry->data[offset];               // 캐시 엔트리의 data 배열의 offset 위치부터 데이터를 1바이트 읽어옴
-        num_bytes++;                                        // 지금까지 접근한 바이트 수를 뜻하는 num_bytes에 +1
-        break;                                              // case 'b' 실행 후 switch문 밖으로 탈출
-    case 'h':                                               // type이 'h', 즉 하프워드(2byte)인 경우
-        accessed_data = *((short*)&pEntry->data[offset]);   // short* 타입으로 주소 변환. => 캐시 엔트리의 data 배열의 offset 위치부터 데이터를 short 크기만큼(2바이트) 읽어옴
-        num_bytes += 2;                                     // 지금까지 접근한 바이트 수를 뜻하는 num_bytes에 +2
-        break;                                              // case 'h' 실행 후 switch문 밖으로 탈출
-    case 'w':                                               // type이 'w', 즉 워드(4byte)인 경우
-        accessed_data = *((int*)&pEntry->data[offset]);     // int* 타입으로 주소 변환. => 캐시 엔트리의 data 배열의 offset 위치부터 데이터를 int 크기만큼(4바이트) 읽어옴
-        num_bytes += 4;                                     // 지금까지 접근한 바이트 수를 뜻하는 num_bytes에 +4
-        break;                                              // case 'w' 실행 후 switch문 밖으로 탈출
+    int accessed_data = -1;                                 // Hold the accessed data (actually retrieved from the copied cache entry), initialized to -1
+    int offset = block_offset;                              // Set the offset to determine which byte of the cache data to retrieve, using the calculated block_offset
+    switch (type) {                                         // Switch statement to handle the input data type specified in the type parameter
+    case 'b':                                               // If type is 'b', i.e., byte (1 byte)
+        accessed_data = pEntry->data[offset];               // Read 1 byte of data from the data array of the cache entry at the offset position
+        num_bytes++;                                        // Increment num_bytes, which represents the total accessed byte count
+        break;                                              // Exit the switch statement after executing case 'b'
+    case 'h':                                               // If type is 'h', i.e., half-word (2 bytes)
+        accessed_data = *((short*)&pEntry->data[offset]);   // Read 2 bytes of data from the data array of the cache entry at the offset position by casting to short*
+        num_bytes += 2;                                     // Increment num_bytes by 2
+        break;                                              // Exit the switch statement after executing case 'h'
+    case 'w':                                               // If type is 'w', i.e., word (4 bytes)
+        accessed_data = *((int*)&pEntry->data[offset]);     // Read 4 bytes of data from the data array of the cache entry at the offset position by casting to int*
+        num_bytes += 4;                                     // Increment num_bytes by 4
+        break;                                              // Exit the switch statement after executing case 'w'
     }
 
-    num_access_cycles += CACHE_ACCESS_CYCLE + MEMORY_ACCESS_CYCLE;      // cache miss case. 캐시와 메모리에 둘 다 접근했으므로 access cycles 수에 cache access cycle + memory access cycle인 +101
-    return accessed_data;                                               // 메모리 접근해 캐시로 복사한 데이터 accessed_data 반환
+    num_access_cycles += CACHE_ACCESS_CYCLE + MEMORY_ACCESS_CYCLE;      // Cache miss case: Adds cache access cycle + memory access cycle (101) to num_access_cycles since both cache and memory are accessed
+    return accessed_data;                                               // Returns the accessed data, which is copied from memory to the cache
 }
+
